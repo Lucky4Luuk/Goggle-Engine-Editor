@@ -1,0 +1,4 @@
+3D texture.
+All 3D pixels store distance to closest point in SDF.
+Get distance from current pixel, jump forward by that much.
+This results in normal raymarching, but the distances aren't calculated but gotten from the 3D texture.
