@@ -10,7 +10,7 @@ The manual way shouldn't be too difficult, though.
 
 The manual way:
 1. Download and extract a ZIP of this repository.
-2. Download a ZIP of the Engine Repository.
-3. Inside the Editor folder, create a folder called "Engine".
-4. Extract the ZIP of the Engine into the Engine folder, making sure that the main.lua is in the Engine folder, and not in Engine/Goggle-Engine-Final.
+~~2. Download a ZIP of the Engine Repository.~~ Step 2,3 and 4 are now redundant as of 13-01-2018. Engine included in this repository.
+~~3. Inside the Editor folder, create a folder called "Engine".
+4. Extract the ZIP of the Engine into the Engine folder, making sure that the main.lua is in the Engine folder, and not in Engine/Goggle-Engine-Final.~~
 5. Run the Editor with Love2D 0.11!
