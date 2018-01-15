@@ -9,5 +9,7 @@ As the Engine is far from being completed, I don't think an installer is coming 
 The manual way shouldn't be too difficult, though.
 
 The manual way:
-1. Download and extract a ZIP of this repository.
-2. Run the Editor with Love2D 0.11!
+1. Download and install Love2D 0.11. Note: this is a nightly build! http://love2d.org/builds
+   The installer for the nightly build is quite hard to find, but it's located in Slime's Appveyor.
+2. Download and extract a ZIP of this repository.
+3. Run the Editor with Love2D 0.11!
