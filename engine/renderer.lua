@@ -10,17 +10,22 @@ local fxaa = nil
 local sensitivityX = 0.5
 local sensitivityY = 0.5
 
-local FLAGS = {AA=false}
+local FLAGS = {AA=true}
+
+local MODE = "game"
 
 function setCamera(pos, dir)
   cam_pos = pos
   cam_dir = dir
 end
 
+function setMode(m)
+  MODE = m
+end
+
 function setRenderSize(w, h)
   width = w
   height = h
-  fxaa:send("RES", {width, height})
   return true
 end
 
@@ -125,7 +130,6 @@ end
 
 function renderer_load()
   fxaa = love.graphics.newShader("engine/shaders/fxaa.glsl")
-  fxaa:send("RES", {width, height})
 end
 
 function render()
@@ -135,12 +139,12 @@ function render()
   send("cam_dir", cam_dir)
   send("screen_res", {width, height})
   love.graphics.setShader(shader)
-  if FLAGS.AA then
+  if FLAGS.AA and MODE == "game" then
     love.graphics.setCanvas(canvas)
   end
 	love.graphics.setColor(1,1,1,1)
 	love.graphics.rectangle("fill",0,0,love.graphics.getWidth(),love.graphics.getHeight())
-  if FLAGS.AA then
+  if FLAGS.AA and MODE == "game" then
     love.graphics.setCanvas()
     love.graphics.setShader(fxaa)
     love.graphics.draw(canvas)

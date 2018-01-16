@@ -15,7 +15,7 @@ require "engine.filesystem"
 require "engine.physics"
 require "engine.utils"
 
-local debug = {FPS=true, CAMERA=false, ERROR=false}
+local debug = {FPS=false, CAMERA=false, ERROR=false}
 
 local width = 768
 local height = 432
@@ -58,6 +58,10 @@ function engine.setTargetResolution(w, h)
 	setSize(w, h)
 	width = w
 	height = h
+end
+
+function engine.setFXAACanvas(c)
+	setCanvas(c)
 end
 
 function setSize(w, h)
@@ -149,6 +153,8 @@ function engine.load()
 	--Reset camera direction in case it rotated.
 	resetCamera()
 
+	setMode("editor")
+
 	console.print("[!] Engine succesfully loaded!")
 end
 
@@ -164,7 +170,6 @@ function rotateCamera()
 	local qx = math.rad(mouseDeltaX*sensitivityX)
 	local qy = -math.rad(mouseDeltaY*sensitivityY)
 	qy = math.floor(qy * 200) / 200
-	print(qy)
 
 	local x = cam_dir[1]
 	local z = cam_dir[3]

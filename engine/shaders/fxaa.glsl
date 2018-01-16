@@ -1,14 +1,16 @@
+uniform vec2 res;
+
 vec4 fxaa(Image buf0, vec2 texCoords, vec2 frameBufSize){
   float FXAA_SPAN_MAX = 8.0;
   float FXAA_REDUCE_MUL = 1.0/8.0;
   float FXAA_REDUCE_MIN = 1.0/128.0;
-  
+
   vec3 rgbNW=Texel(buf0,texCoords+(vec2(-1.0,-1.0)/frameBufSize)).xyz;
   vec3 rgbNE=Texel(buf0,texCoords+(vec2(1.0,-1.0)/frameBufSize)).xyz;
   vec3 rgbSW=Texel(buf0,texCoords+(vec2(-1.0,1.0)/frameBufSize)).xyz;
   vec3 rgbSE=Texel(buf0,texCoords+(vec2(1.0,1.0)/frameBufSize)).xyz;
   vec3 rgbM=texture2D(buf0,texCoords).xyz;
-  
+
   vec3 luma=vec3(0.299, 0.587, 0.114);
   float lumaNW = dot(rgbNW, luma);
   float lumaNE = dot(rgbNE, luma);
@@ -40,7 +42,7 @@ vec4 fxaa(Image buf0, vec2 texCoords, vec2 frameBufSize){
       Texel(buf0, texCoords.xy + dir * (0.0/3.0 - 0.5)).xyz +
       Texel(buf0, texCoords.xy + dir * (3.0/3.0 - 0.5)).xyz);
   float lumaB = dot(rgbB, luma);
-  
+
   if ((lumaB < lumaMin) || (lumaB > lumaMax)) {
     return vec4(rgbA,1.0);
   } else {
@@ -49,6 +51,6 @@ vec4 fxaa(Image buf0, vec2 texCoords, vec2 frameBufSize){
 }
 
 vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){
-  vec4 pixel = fxaa(texture, texture_coords, love_ScreenSize.xy);
+  vec4 pixel = fxaa(texture, texture_coords, res);
   return pixel * color;
 }
