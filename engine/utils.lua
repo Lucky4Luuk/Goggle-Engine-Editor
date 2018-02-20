@@ -16,6 +16,9 @@ function genMainShader()
   for line in io.lines("engine/shaders/fragment_pre.glsl") do
     table.insert(lines, line)
   end
+  for line in io.lines("engine/shaders/quality.glsl") do
+    table.insert(lines, line)
+  end
   for line in io.lines("engine/shaders/mercury_hg_sdf_functions.glsl") do
     table.insert(lines, line)
   end

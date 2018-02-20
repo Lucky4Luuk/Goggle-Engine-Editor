@@ -1,13 +1,4 @@
-#pragma language glsl3
-
-#define SAMPLES 128
-
-#define AA 1
-#define GI 1
-
-#define BUMP_FACTOR 0.015
-
-#define STEP_SIZE 1
+//#pragma language glsl3
 
 #define saturate(x) clamp(x, 0.0, 1.0)
 #define PI 3.14159265359
@@ -77,6 +68,17 @@ struct GI_TRACE {
 	int id;
 	vec4 m; //Material
 };
+#define SAMPLES 32 //More samples means better image quality.
+
+#define AA 1 //The amount of MSAA. Usually not needed, as it's quite heavy.
+//The engine already uses FXAA too.
+#define GI 1 //Switch between the old, non-PBR lighting system and the new lighting system.
+//GI = 1 means the new lighting system. Right now, it doesn't actually control GI, as there is none.
+
+#define BUMP_FACTOR 0.015 //Leave like this if you don't know what you are doing.
+//Just a basic multiplier for the BUMP_FACTOR, although it's not used right now.
+#define STEP_SIZE 1 //If bigger, it might get glitchy but will also speed up.
+//Leave at 1 if you don't know what you are doing.
 //Mercury HG_SDF
 
 // Sign function that doesn't return 0
