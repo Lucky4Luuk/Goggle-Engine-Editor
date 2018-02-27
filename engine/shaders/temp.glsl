@@ -3,46 +3,51 @@
 #define saturate(x) clamp(x, 0.0, 1.0)
 #define PI 3.14159265359
 
-int GI_maxDistance = 20;
-int GI_maxBounces = 4;
+int GI_maxDistance = 20; //Unused
+int GI_maxBounces = 4; //Unused
 
 uniform vec2 iTime;
 uniform vec3 cam_pos;
 uniform vec3 cam_dir;
 uniform int object_amount;
 uniform int light_amount;
-uniform sampler2D tex_atlas;
-uniform sampler2D bump_atlas;
-uniform struct Object
+uniform sampler2D tex_atlas; //The Texture Atlas.
+//Using this, we still can't have many textures, but it's better than none.
+uniform sampler2D bump_atlas; //The Bump Texture Atlas. Same limitation as the Texture Atlas.
+uniform struct Object //This defines the paramaters of the type 'Object'.
 {
-	int Type;
-	int i; //Object ID
-	vec3 p; //Vector 3: position
-	vec3 b; //Vector 3: size (if sphere, only x is used)
-	mat3 r; //Matrix 3: rotation
-	vec3 color;
-	bool isTextured;
-	bool hasBumpMap;
-	vec3 tex_offset;
-	vec3 bump_offset;
-	vec2 texsize;
-	vec2 texrepeat;
-	vec3 avg_tex_col;
-	float alpha;
-	float ref;
-	float roughness;
-	float metallic;
-} objects[30];
-uniform struct Light
+	int Type; //Object Type.
+	int i; //Object ID.
+	vec3 p; //Vector 3: position.
+	vec3 b; //Vector 3: size (if sphere, only x is used).
+	mat3 r; //Matrix 3: rotation.
+	vec3 color; //Base color.
+	bool isTextured; //Defines if it's textured or not.
+	bool hasBumpMap; //Defines if it uses a bumpmap or not.
+	vec3 tex_offset; //UV offset.
+	//The Z component used to refer to which Texture Atlas to use, but this isn't used for now.
+	vec3 bump_offset; //UV offset for the tex_offset. The Z component is the same as the one used in tex_offset.
+	vec2 texsize; //Texture size.
+	vec2 texrepeat; //Texture repeat.
+	//The UV coord calculated gets a modulo applied to it, using this as 'b' in mod(a, b).
+	vec3 avg_tex_col; //Average Texture Color. Unused, but planned to be used for GI.
+	float alpha; //Alpha of the object. Unused for now.
+	float ref; //Reflectivity. Usually just 1, as it's a multiplier to the final result.
+	float roughness; //Roughness of the object. Used for the PBR lighting system.
+	float metallic; //Metallic value of the object. Used for the PBR lighting system.
+} objects[30]; //Final definition of the amount of uniforms of type 'Object'.
+uniform struct Light //This defines the paramaters of the type 'Light'.
 {
-	int Type;
-	vec3 p;
-	vec3 d;
-	vec3 color;
-} lights[50];
-uniform float fog_density;
-uniform float view_distance;
-uniform vec2 screen_res;
+	int Type; //Light type.
+	vec3 p; //Light position. Not used for the Directional Light.
+	vec3 d; //Light direction. In case of a pointlight, only the x component is used (as radius).
+	vec3 color; //Light color.
+} lights[50]; //Final definition of the amount of uniforms of type 'Light'.
+uniform float fog_density; //The fog density.
+uniform float view_distance; //The view distance.
+uniform vec2 screen_res; //The screen resolution.
+//Used instead of love_ScreenSize, as I found that it didn't always report correctly.
+//This was probably an error on my side, but this at least works.
 
 
 // mat3 rotate3DX(float a) { return mat3(1.,0.,0.,0.,cos(a),-sin(a),0,sin(a),cos(a));}
@@ -52,33 +57,38 @@ uniform vec2 screen_res;
 
 //Define RESULT
 struct RESULT {
-	vec4 re;
-	int i;
+	vec4 re; //Vec4 re: x=distance, yzw=color.
+	int i; //Object ID.
 };
 
 struct L_RESULT {
-	float t;
-	vec4 m; //Material
-	int id;
+	float t; //Distance.
+	vec4 m; //Material.
+	int id; //Object ID.
 };
 
 struct GI_TRACE {
-	vec3 pos;
-	vec3 dir;
-	int id;
-	vec4 m; //Material
+	vec3 pos; //Hit position.
+	vec3 dir; //Direction in which the light bounces.
+	int id; //Object ID.
+	vec4 m; //Material.
 };
-#define SAMPLES 32 //More samples means better image quality.
+#define SAMPLES 128 //More samples means better image quality.
 
 #define AA 1 //The amount of MSAA. Usually not needed, as it's quite heavy.
 //The engine already uses FXAA too.
+
 #define GI 1 //Switch between the old, non-PBR lighting system and the new lighting system.
 //GI = 1 means the new lighting system. Right now, it doesn't actually control GI, as there is none.
 
 #define BUMP_FACTOR 0.015 //Leave like this if you don't know what you are doing.
 //Just a basic multiplier for the BUMP_FACTOR, although it's not used right now.
-#define STEP_SIZE 1 //If bigger, it might get glitchy but will also speed up.
+
+#define STEP_SIZE 1 //If bigger, it might get glitchy but might also speed up.
 //Leave at 1 if you don't know what you are doing.
+//Putting it lower than 1 might help with the accuracy of distance fields.
+
+#define CHECKERBOARD 1 //Turns on checkerboard rendering. Renders every other pixel, interpolates the rest.
 //Mercury HG_SDF
 
 // Sign function that doesn't return 0
@@ -299,47 +309,72 @@ float opUColumns(float a, float b, float r, float n) {
 	}
 }
 
-
+//Function opU:
+//Boolean operation: union. Combines 2 distance fields.
+//From http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
 vec4 opU( vec4 d1, vec4 d2 )
 {
 	return (d1.x<d2.x) ? d1 : d2;
 }
 
+//Function opS:
+//Boolean operation: subtraction. Subtracts distance field d2 from d1.
+//From http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
 float opS( float d1, float d2 )
 {
     return max(-d1,d2);
 }
 
+//Function opI:
+//Boolean operation: intersection. Intersection between distance field d1 and d2.
+//From http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
 float opI( float d1, float d2 )
 {
     return max(d1,d2);
 }
 
+//Function opMorph:
+//Boolean operation: morph. Morphs distance field d1 to d2, using A (range 0-1).
 float opMorph(float d1, float d2, float a)
 {
     a = clamp(a,0.0,1.0);
     return a * d1 + (1.0 - a) * d2;
 }
 
-// distance to sphere function (p is world position of the ray, s is sphere radius)
-// from http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
+//Signed distance to a sphere:
+//P is the position of the ray relative to the object.
+//S is the sphere's radius.
+//From http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
 float sdSphere(vec3 pc, float s, mat3 r)
 {
 	vec3 p = r * pc;
 	return length(p) - s;
 }
 
+//Signed distance to an infinite plane:
+//P is the position of the ray relative to the object.
+//From http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
 float sdPlane(vec3 p)
 {
     return p.y;
 }
 
+//Unsigned distance to a box:
+//P is the position of the ray relative to the object.
+//B is the box's size
+//R is the box's rotation matrix (inverse, calculated on the CPU).
+//From http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
 float udBox( vec3 pc, vec3 b, mat3 r )
 {
 	vec3 p = r * pc;
   return length(max(abs(p)-b,0.0));
 }
 
+//Signed distance to a box:
+//P is the position of the ray relative to the object.
+//B is the box's size.
+//R is the box's rotation matrix (inverse, calculated on the CPU).
+//From http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
 float sdBox(vec3 pc, vec3 b, mat3 r)
 {
 	vec3 p = r * pc;
@@ -347,11 +382,14 @@ float sdBox(vec3 pc, vec3 b, mat3 r)
 	return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
 }
 
+//Distance to a mesh:
+//BROKEN//
 float udMesh(vec3 p, int id)
 {
 	return sdBox(p, vec3(float(id)), mat3(0.0));
 }
 
+//Function to get the corresponding UV coordinates on the texture atlas, using the object's UV coordinates.
 vec4 getTexel(sampler2D tex, vec2 uv, vec3 offset, vec2 ts)
 {
 	vec2 size = vec2(8192.0);
@@ -360,21 +398,32 @@ vec4 getTexel(sampler2D tex, vec2 uv, vec3 offset, vec2 ts)
 	return Texel(tex, global_uv + local_uv);
 }
 
-vec3 cubeTex(vec3 p, vec3 n, sampler2D tex, vec2 tr, vec3 offset, vec2 ts)
+//Function to texture a box, using Triplanar Mapping.
+vec3 cubeTex(vec3 p, vec3 n, sampler2D tex, vec2 tr, vec3 offset, vec2 ts, mat3 r)
 {
+	p = r * p;
+	n = r * n;
 	return getTexel( tex, mod(p.yz, tr), offset, ts ).rgb*abs(n.x)+
 				 getTexel( tex, mod(p.xz, tr), offset, ts ).rgb*abs(n.y)+
 				 getTexel( tex, mod(p.xy, tr), offset, ts ).rgb*abs(n.z);
 }
 
-float sdBoxBump(vec3 samplePos, vec3 boxPos, vec3 boxDim, sampler2D bumptex, vec2 tr, vec3 offset, vec2 ts)
+//Signed distance to a bumpmapped box:
+//samplePos is the worldposition of the ray.
+//boxPos is the box's position.
+//boxDim is the box's size.
+//bumptex is the bumpmap used.
+//tr is the box's tex_repeat variable.
+//offset is the box's tex_offset variable.
+//ts is the bumpmap's size.
+float sdBoxBump(vec3 samplePos, vec3 boxPos, vec3 boxDim, sampler2D bumptex, vec2 tr, vec3 offset, vec2 ts, mat3 r)
 {
 	vec3 normal;
 	float bump = 0.0;
 	if(length(samplePos-boxPos) < length(boxDim))
 	{
 		normal = normalize(samplePos-boxPos);
-		vec3 bumpcol = cubeTex(samplePos*0.1, normal, bumptex, tr, offset, ts);
+		vec3 bumpcol = cubeTex(samplePos*0.1, normal, bumptex, tr, offset, ts, r);
 		bump = bumpcol.g*BUMP_FACTOR;
 	}
 	vec3 d = abs(samplePos-boxPos) - boxDim;
@@ -382,7 +431,8 @@ float sdBoxBump(vec3 samplePos, vec3 boxPos, vec3 boxDim, sampler2D bumptex, vec
 		length(max(d,0.0))+bump;
 }
 
-// http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
+//http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
+//For the Bezier Curve.
 float det( vec2 a, vec2 b ) { return a.x*b.y-b.x*a.y; }
 vec3 getClosest( vec2 b0, vec2 b1, vec2 b2 )
 {
@@ -402,6 +452,8 @@ vec3 getClosest( vec2 b0, vec2 b1, vec2 b2 )
     return vec3( mix(mix(b0,b1,t), mix(b1,b2,t),t), t );
 }
 
+//Unsupported right now, but will work on this.
+//By Inigo Quilez, IIRC.
 vec4 sdBezier( vec3 a, vec3 b, vec3 c, vec3 p )
 {
 	vec3 w = normalize( cross( c-b, a-b ) );
@@ -418,6 +470,7 @@ vec4 sdBezier( vec3 a, vec3 b, vec3 c, vec3 p )
 	return vec4( sqrt(dot(cp.xy,cp.xy)+p3.z*p3.z), cp.z, length(cp.xy), p3.z );
 }
 
+//Modulo function that supports negative numbers.
 float fmod(float a, float b)
 {
   if(a<0.0)
@@ -427,63 +480,72 @@ float fmod(float a, float b)
   return mod(a, b);
 }
 
-vec3 get_texture(vec3 p, vec3 n, int t, vec2 ts, vec2 tr, sampler2D tex, vec3 offset)
+//General texture mapping function.
+//P is the worldposition where the object was hit.
+//N is the surface normal corresponding to position P.
+//T is the object's type.
+//TS is the texture's size.
+//tex is the texturemap.
+//offset is the object's tex_offset variable.
+vec3 get_texture(vec3 p, vec3 n, int t, vec2 ts, vec2 tr, sampler2D tex, vec3 offset, mat3 r)
 {
-	if (t == 1)
+	if (t == 1) //Plane. Has it's own math, because it's always perfectly level, thus faster to calculate.
 	{
 		vec2 uv = mod(p.xz, tr);
 		if (uv.x > 0 && uv.y > 0 && uv.x < tr.x && uv.y < tr.y) return getTexel(tex, uv, offset, ts).rgb;
-	} else if (t == 2)
+	} else if (t == 2) //Sphere. Has it's own math, because it's a little different to calculate.
 	{
 		// float u = asin(n.x)/PI + 0.5;
 		// float v = asin(n.y)/PI + 0.5;
 		float u = n.x/2 + 0.5;
 		float v = n.y/2 + 0.5;
 		return getTexel(tex, vec2(u, v), offset, ts).rgb;
-	} else if (t == 4)
+	} else if (t == 4) //Cube. Just calls cubeTex.
 	{
-		return cubeTex(p, n, tex_atlas, tr, offset, ts);
+		return cubeTex(p, n, tex_atlas, tr, offset, ts, r);
 	}
 	return vec3(1.0);
 }
 
+//Function that "maps" the scene.
+//pos is the worldposition of the ray.
 RESULT map(vec3 pos)
 {
-	vec4 res = vec4(-1.0);
+	vec4 res = vec4(-1.0); //Variable for final result.
 	int id = 0;
 	float closest;
 
 	if (object_amount > 0)
 	{
-		if (objects[0].Type == 1)
+		if (objects[0].Type == 1) //Plane.
 		{
 			float q = sdPlane(pos - objects[0].p);
 			res = vec4(q,objects[0].color);
 			closest = q;
-		} else if (objects[0].Type == 2)
+		} else if (objects[0].Type == 2) //Sphere.
 		{
 			float q = sdSphere(pos - objects[0].p,objects[0].b.x, objects[0].r);
 			res = vec4(q,objects[0].color);
 			closest = q;
-		} else if (objects[0].Type == 3)
+		} else if (objects[0].Type == 3) //Unsigned box.
 		{
 			float q = udBox(pos - objects[0].p,objects[0].b, objects[0].r);
 			res = vec4(q,objects[0].color);
 			closest = q;
-		} else if (objects[0].Type == 4)
+		} else if (objects[0].Type == 4) //Signed box.
 		{
 			float q = 0.0;
 			if (objects[0].hasBumpMap)
 			{
 				//float sdBoxBump(vec3 samplePos, vec3 boxPos, vec3 boxDim, sampler2D bumptex, vec2 tr, vec3 offset, vec2 ts)
-				q = sdBoxBump(pos, objects[0].p, objects[0].b, bump_atlas, objects[0].texrepeat, objects[0].bump_offset, objects[0].texsize);
+				q = sdBoxBump(pos, objects[0].p, objects[0].b, bump_atlas, objects[0].texrepeat, objects[0].bump_offset, objects[0].texsize, objects[0].r);
 				// q = sdBox(pos - objects[0].p,objects[0].b);
 			} else {
 				q = sdBox(pos - objects[0].p,objects[0].b, objects[0].r);
 			}
 			res = vec4(q,objects[0].color);
 			closest = q;
-		} else if (objects[0].Type == 5) //A mesh
+		} else if (objects[0].Type == 5) //Mesh.
 		{
 			float q = udMesh(pos - objects[0].p, int(objects[0].tex_offset.x));
 			res = vec4(q, objects[0].color);
@@ -491,9 +553,10 @@ RESULT map(vec3 pos)
 		}
 		id = objects[0].i;
 
-		for (int o = 1; o < 1024; o++)
+		for (int o = 1; o < 1024; o++) //Constant length loop, to make it faster.
 		{
-			if (o>object_amount) break;
+			if (o>object_amount) break; //To break the loop when it is going over the limit.
+			//Using the if-statement to break the loop and having a constant loop length, we can make the loop a lot faster.
 			if (objects[o].Type == 1)
 			{
 				float q = sdPlane(pos - objects[o].p);
@@ -526,7 +589,7 @@ RESULT map(vec3 pos)
 				float q = 0.0;
 				if (objects[o].hasBumpMap)
 				{
-					q = sdBoxBump(pos, objects[o].p, objects[o].b, bump_atlas, objects[o].texrepeat, objects[o].bump_offset, objects[o].texsize);
+					q = sdBoxBump(pos, objects[o].p, objects[o].b, bump_atlas, objects[o].texrepeat, objects[o].bump_offset, objects[o].texsize, objects[o].r);
 					// q = sdBox(pos - objects[o].p,objects[o].b);
 				} else {
 					q = sdBox(pos - objects[o].p,objects[o].b, objects[o].r);
@@ -556,6 +619,8 @@ RESULT map(vec3 pos)
   return r;
 }
 
+//Function for glass.
+//BROKEN//
 vec3 getGlass(vec3 pos, vec3 dir)
 {
 	float tmin = 0.005;
@@ -585,6 +650,11 @@ vec3 getGlass(vec3 pos, vec3 dir)
 	return m;
 }
 
+//Softshadow function.
+//RO is the ray's origin, in this case the light's origin.
+//RD is the ray's direction, in this case the light's direction.
+//mint is the near plane value.
+//tmax is the far plane value.
 float softshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 {
 	float res = 1.0;
@@ -599,6 +669,9 @@ float softshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
   return clamp( res, 0.0, 1.0 );
 }
 
+//Calculates the normal, by sampling the scene multiple times with small offsets.
+//Using the values it can determine the surface normal.
+//MAGIC//
 vec3 calcNormal( in vec3 pos )
 {
     vec2 e = vec2(1.0,-1.0)*0.5773*0.0005;
@@ -608,6 +681,9 @@ vec3 calcNormal( in vec3 pos )
 					  e.xxx*map( pos + e.xxx ).re.x );
 }
 
+//Casts a ray through the scene.
+//pos is the ray's origin.
+//dir is the ray's direction.
 RESULT castRay(vec3 pos, vec3 dir)
 {
     float tmin = 0.005;
@@ -641,6 +717,10 @@ RESULT castRay(vec3 pos, vec3 dir)
 		return re;
 }
 
+//Function that calculates AO.
+//It does a small raymarch in the surface normal's direction, to determine how close stuff is to the object.
+//pos is the worldposition where the object was hit.
+//nor is the surface normal corresponding to pos.
 float calcAO( in vec3 pos, in vec3 nor )
 {
 	float occ = 0.0;
@@ -656,6 +736,10 @@ float calcAO( in vec3 pos, in vec3 nor )
   return clamp( 1.0 - 3.0*occ, 0.0, 1.0 );
 }
 
+//Function to calculate fog.
+//pos is the ray's origin.
+//rd is the ray's direction.
+//sky_color is the color of the sky.
 vec3 calcFog(vec3 pos, vec3 rd, vec3 sky_color)
 {
 	float d = length(pos)*0.6*fog_density;
@@ -666,24 +750,12 @@ vec3 calcFog(vec3 pos, vec3 rd, vec3 sky_color)
 	return col;
 }
 
-// float calcSSS( in vec3 pos, in vec3 nor )
-// {
-//   vec4 kk;
-// 	float occ = 0.0;
-//   for( int i=0; i<8; i++ )
-//   {
-//       float h = 0.002 + 0.11*float(i)/7.0;
-//       vec3 dir = normalize( sin( float(i)*13.0 + vec3(0.0,2.1,4.2) ) );
-//       dir *= sign(dot(dir,nor));
-//       occ += (h-mapOpaque(pos-h*dir, kk).x);
-//   }
-//   occ = clamp( 1.0 - 11.0*occ/8.0, 0.0, 1.0 );
-//   return occ*occ;
-// }
-
 //------------------------------------------------------------------------------
 // BRDF
 //------------------------------------------------------------------------------
+
+//This is where the real magic happens.
+//Behold, the PBR lighting system.
 
 float pow5(float x) {
     float x2 = x * x;
@@ -732,6 +804,9 @@ float Fd_Lambert() {
 // Indirect lighting
 //------------------------------------------------------------------------------
 
+//MORE LIGHTING
+//Handles indirect lighting. Not GI, but it does handle reflections.
+
 vec3 Irradiance_SphericalHarmonics(const vec3 n) {
     // Irradiance from "Ditch River" IBL (http://www.hdrlabs.com/sibl/archive.html)
     return max(
@@ -753,6 +828,9 @@ vec2 PrefilteredDFG_Karis(float roughness, float NoV) {
     return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
+//Hardshadow function.
+//Pretty much unused, but the BRDF functions sometimes use it.
+//No reason to use it over the softshadow function, as it has the same artifacts, same performance but looks worse.
 float shadow(in vec3 origin, in vec3 direction) {
   float hit = 1.0;
   float t = 0.02;
@@ -768,7 +846,18 @@ float shadow(in vec3 origin, in vec3 direction) {
   return clamp(hit, 0.0, 1.0);
 }
 
-vec3 BRDF (vec3 pos, vec3 n, vec3 rd, vec3 l, vec3 lp, float range, vec3 baseColor, float roughness, float metallic) //n is normal, l is lighting direction
+//Oh boy.
+//The final BRDF function that ties it all together.
+//pos is the worldposition where the object was hit.
+//n is the surface normal corresponding to pos.
+//rd is the ray's direction.
+//l is the current light's direction.
+//lp is the current light's position.
+//range is the light's range (not used for the directional light).
+//baseColor is the object's base color.
+//roughness is the object's roughness.
+//metallic is the object's metallic value.
+vec3 BRDF (vec3 pos, vec3 n, vec3 rd, vec3 l, vec3 lp, float range, vec3 baseColor, float roughness, float metallic)
 {
 	vec3 color = vec3(0.0);
 
@@ -784,7 +873,7 @@ vec3 BRDF (vec3 pos, vec3 n, vec3 rd, vec3 l, vec3 lp, float range, vec3 baseCol
 	float intensity = 2.0; //Default: 2.0
 	float indirectIntensity = 0.64; //Default: 0.64
 
-	if (range > 0) {
+	if (range > 0) { //This is probably the worst distance calculation possible. But it seems to work.
 		intensity = 0.0;
 		indirectIntensity = 0.0;
 		intensity += clamp(range-distance(pos, lp),0.0,range);
@@ -831,6 +920,8 @@ vec3 BRDF (vec3 pos, vec3 n, vec3 rd, vec3 l, vec3 lp, float range, vec3 baseCol
 	return color;
 }
 
+//Function to tonemap the scene using ACES.
+//x is the current pixel color (no alpha, as the final result doesn't contain any alpha either).
 vec3 Tonemap_ACES(const vec3 x) {
   // Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
   const float a = 2.51;
@@ -841,6 +932,14 @@ vec3 Tonemap_ACES(const vec3 x) {
   return (x * (a * x + b)) / (x * (c * x + d) + e);
 }
 
+//The render function:
+//This function performs the following steps:
+//1. Call castRay function.
+//2. Apply lighting, ambient occlusion, fog, etc.
+//3. DONE!
+//Parameters:
+//ro is the ray's origin.
+//rd is the ray's direction.
 vec3 render( in vec3 ro, in vec3 rd )
 {
 	vec3 col = vec3(0.7, 0.9, 1.0) + rd.y*0.8;
@@ -861,7 +960,7 @@ vec3 render( in vec3 ro, in vec3 rd )
 		// material
 		col = m;
 		//vec3 get_texture(vec3 p, vec3 n, int t, vec2 ts, vec2 tr, sampler2D tex, vec3 offset)
-		if (objects[id].isTextured) col *= get_texture(pos - objects[id].p, nor, objects[id].Type, objects[id].texsize, objects[id].texrepeat, tex_atlas, objects[id].tex_offset);
+		if (objects[id].isTextured) col *= get_texture(pos - objects[id].p, nor, objects[id].Type, objects[id].texsize, objects[id].texrepeat, tex_atlas, objects[id].tex_offset, objects[id].r);
 		if (m.x == -2.0)
 		{
 			if (m.y == -2.0)
@@ -879,6 +978,7 @@ vec3 render( in vec3 ro, in vec3 rd )
 		if (GI > 0) {
 			//GI is 1, so prepare yourself for a lot of pain.
 			//Goodbye life
+			//Update: not as bad as it appeared
 			for (int i=0; i<1024; i++) {
 				if (i>light_amount) break;
 				if (lights[i].Type == 1) {
@@ -958,6 +1058,10 @@ vec3 render( in vec3 ro, in vec3 rd )
 	return vec3( clamp(c,0.0,1.0) );
 }
 
+//setCamera is a function to get the camera's rotation matrix.
+//ro is the ray's origin.
+//ta is the ray's direction.
+//cr is the ray's rotation around the camera's direction (roll).
 mat3 setCamera( in vec3 ro, in vec3 ta, float cr )
 {
 	vec3 cw = normalize(ta-ro);
@@ -967,39 +1071,51 @@ mat3 setCamera( in vec3 ro, in vec3 ta, float cr )
     return mat3( cu, cv, cw );
 }
 
+//Main function.
+//color is the color drawn with inside Love2D.
+//texture is the texture drawn to.
+//texture_coords are the UV coordinates Love2D specifies.
+//screen_coords are the current pixel's screen coordinates. Used to calculate the proper UV coordinates in my case.
 vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords)
 {
 	vec2 fragCoord = vec2(screen_coords.x, screen_res.y - screen_coords.y);
+#if CHECKERBOARD
+	float offset = mod(fragCoord.y, 2.0);
+	if (mod(fragCoord.x + offset, 2.0) > 0.5)
+	{
+		return vec4(0.0);
+	}
+#endif
 	float time = 15.0 + iTime.x;
 
   vec3 tot = vec3(0.0,0.0,0.0);
-#if AA>1
+#if AA>1 //For multisampling.
   for( int m=0; m<AA; m++ )
   for( int n=0; n<AA; n++ )
   {
-    // pixel coordinates
+    //Pixel coordinates
     vec2 o = vec2(float(m),float(n)) / float(AA) - 0.5;
     vec2 p = (-screen_res.xy + 2.0*(fragCoord+o))/screen_res.y;
 #else
     vec2 p = (-screen_res.xy + 2.0*fragCoord)/screen_res.y;
 #endif
 
-		// camera
+		//Camera
     vec3 ro = cam_pos;
 		vec3 ta = cam_pos + cam_dir;
-		// camera-to-world matrix
+		//Camera-to-world matrix
 		mat3 ca = setCamera(ro, ta, 0.0);
-    // ray direction
+    //Ray direction
     vec3 rd = ca * normalize(vec3(p.xy,2.0));
 
-    // render
+    //Render the scene
     vec3 col = render( ro, rd );
 
-		// gamma
+		//Apply gamma correction.
     col = pow( col, vec3(0.4545) );
 
     tot += col;
-#if AA>1
+#if AA>1 //Again, for multisampling.
     }
     tot /= float(AA*AA);
 #endif

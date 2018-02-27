@@ -1,3 +1,9 @@
+local console = {}
+
+function utils_setConsole(l)
+  console = l
+end
+
 math.randomseed(os.clock()+os.time())
 local random = math.random
 function uuid()
@@ -55,34 +61,6 @@ local function getRotMatZ(a)
 end
 
 function getRotationMatrix(x, y, z)
-  --[[mat3 rotate3DX(float a) {
-    float c = cos(a);
-    float s = sin(a);
-    mat3 m;
-    m[0] = vec3(1.0,0.0,0.0);
-    m[1] = vec3(0.0,  c,  s);
-    m[2] = vec3(0.0, -s,  c);
-    return m;
-  }
-  mat3 rotate3DY(float a) {
-    float c = cos(a);
-    float s = sin(a);
-    mat3 m;
-    m[0] = vec3(  c,0.0, -s);
-    m[1] = vec3(0.0,1.0,0.0);
-    m[2] = vec3(  s,0.0,  c);
-    return m;
-  }
-  mat3 rotate3DZ(float a) {
-    float c = cos(a);
-    float s = sin(a);
-    mat3 m;
-    m[0] = vec3(  c, -s,0.0);
-    m[1] = vec3(  s,  c,0.0);
-    m[2] = vec3(0.0,0.0,1.0);
-    return m;
-  }
-  mat3 rotate3D(float x,float y,float z) { return rotate3DX(x)*rotate3DY(y)*rotate3DZ(z); }]]
   local mx = getRotMatX(math.rad(x))
   local my = getRotMatY(math.rad(y))
   local mz = getRotMatZ(math.rad(z))
@@ -137,6 +115,9 @@ end
 function prerequire(name)
   local status, lib = pcall(require, name)
   if (status) then return lib end
-  print("Script ".. tostring(name:gsub("%.","/")).." doesn't exist!")
+  local error = "Script ".. tostring(name:gsub("%.","/")).." doesn't exist!"
+  if console.print then
+    console.print(error)
+  end
   return nil
 end

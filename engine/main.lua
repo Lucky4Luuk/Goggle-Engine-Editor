@@ -15,7 +15,7 @@ require "engine.filesystem"
 require "engine.physics"
 require "engine.utils"
 
-local debug = {FPS=false, CAMERA=false, ERROR=false}
+local debug = {FPS=true, CAMERA=false, ERROR=true}
 
 local width = 768
 local height = 432
@@ -52,6 +52,10 @@ local errors = {}
 local first_frame = true
 local TIMESTEP = 0
 local TIMESTEPLENGTH = 1/60
+
+local CHECKERBOARD = true
+local CHECKER_SHADER = nil
+local CHECKER_CANVAS = nil
 
 function engine.setTargetResolution(w, h)
 	setRenderSize(w, h)
@@ -112,24 +116,32 @@ function newMeshObject(pos, color, roughness, metallic, ref, volumetexture)
 end
 
 function engine.load()
+	utils_setConsole(console)
 	console.print("[-] Engine is loading...")
 	console.print("[-] Creating render canvas...")
 	--Create canvas for scaling
 	renderer_load()
 	setSize(width, height)
-	setCanvas(love.graphics.newCanvas(width,height, {msaa=4}))
+	setCanvas(love.graphics.newCanvas(width,height))
 	console.print("[!] Render canvas created!")
 
-	console.print("[-] Generating and loading main shader...")
+	console.print("[-] Generating and loading Nain Shader...")
 	--Gen & Load shader
 	genMainShader()
 	setShader(love.graphics.newShader("engine/shaders/temp.glsl"))
-	console.print("[!] Shader generated and loaded succesfully!")
+	console.print("[!] Main Shader generated and loaded succesfully!")
+
+	console.print("[-] Loading Checkerboard Shader and creating Checkerboard Canvas...")
+	CHECKER_SHADER = love.graphics.newShader("engine/shaders/checkerboard.glsl")
+	console.print("[!] Checkerboard Shader loaded succesfully!")
+	CHECKER_CANVAS = love.graphics.newCanvas(width, height)
+	console.print("[!] Checkerboard Canvas loaded succesfully!")
 
 	console.print("[-] Loading scene...")
 	--Load testing data
 	loadModel("floor.dmod")
-	loadModel("box.dmod")
+	-- loadModel("box.dmod")
+	loadModel("test.dmod")
 	--loadModel(newMeshObject({5,0.5,0}, {255,255,255}, 0.2, 0, 1, MeshToSDF("Models/tigre_sumatra_sketchfab.obj", 2)))
 	console.print("[!] Scene loaded!")
 
@@ -257,7 +269,18 @@ end
 
 function engine.draw()
 	--Draw Stuff
-	render()
+	if CHECKERBOARD then
+		CHECKER_CANVAS = render(CHECKER_CANVAS)
+	else
+		render()
+	end
+
+	--Handle Checkerboard Stuff
+	if CHECKERBOARD then
+		love.graphics.setShader(CHECKER_SHADER)
+		love.graphics.draw(CHECKER_CANVAS)
+		love.graphics.setShader()
+	end
 
 	--FPS Counter
 	love.graphics.setShader()
@@ -292,7 +315,8 @@ function engine.keypressed(k)
 			width = min_width
 			height = min_height
 			love.window.setFullscreen(false)
-			canvas = love.graphics.newCanvas(width,height, {msaa=4})
+			canvas = love.graphics.newCanvas(width,height)
+			CHECKER_CANVAS = love.graphics.newCanvas(width, height)
 		else
 			fullscreen = true
 			width = modes[#modes].width
@@ -311,6 +335,8 @@ function engine.keypressed(k)
 end
 
 function engine.resize(w, h)
+	canvas = love.graphics.newCanvas(width,height)
+	CHECKER_CANVAS = love.graphics.newCanvas(width, height)
 	setSize(width, height)
 	updateAtlas(tex_atlas[1], bump_atlas[1])
 	updateObjectsList(engine.objects, meshes)

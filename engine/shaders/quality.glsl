@@ -1,4 +1,4 @@
-#define SAMPLES 32 //More samples means better image quality.
+#define SAMPLES 128 //More samples means better image quality.
 
 #define AA 1 //The amount of MSAA. Usually not needed, as it's quite heavy.
 //The engine already uses FXAA too.
@@ -12,3 +12,5 @@
 #define STEP_SIZE 1 //If bigger, it might get glitchy but might also speed up.
 //Leave at 1 if you don't know what you are doing.
 //Putting it lower than 1 might help with the accuracy of distance fields.
+
+#define CHECKERBOARD 1 //Turns on checkerboard rendering. Renders every other pixel, interpolates the rest.

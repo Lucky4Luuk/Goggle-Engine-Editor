@@ -89,8 +89,10 @@ vec4 getTexel(sampler2D tex, vec2 uv, vec3 offset, vec2 ts)
 }
 
 //Function to texture a box, using Triplanar Mapping.
-vec3 cubeTex(vec3 p, vec3 n, sampler2D tex, vec2 tr, vec3 offset, vec2 ts)
+vec3 cubeTex(vec3 p, vec3 n, sampler2D tex, vec2 tr, vec3 offset, vec2 ts, mat3 r)
 {
+	p = r * p;
+	n = r * n;
 	return getTexel( tex, mod(p.yz, tr), offset, ts ).rgb*abs(n.x)+
 				 getTexel( tex, mod(p.xz, tr), offset, ts ).rgb*abs(n.y)+
 				 getTexel( tex, mod(p.xy, tr), offset, ts ).rgb*abs(n.z);
@@ -104,14 +106,14 @@ vec3 cubeTex(vec3 p, vec3 n, sampler2D tex, vec2 tr, vec3 offset, vec2 ts)
 //tr is the box's tex_repeat variable.
 //offset is the box's tex_offset variable.
 //ts is the bumpmap's size.
-float sdBoxBump(vec3 samplePos, vec3 boxPos, vec3 boxDim, sampler2D bumptex, vec2 tr, vec3 offset, vec2 ts)
+float sdBoxBump(vec3 samplePos, vec3 boxPos, vec3 boxDim, sampler2D bumptex, vec2 tr, vec3 offset, vec2 ts, mat3 r)
 {
 	vec3 normal;
 	float bump = 0.0;
 	if(length(samplePos-boxPos) < length(boxDim))
 	{
 		normal = normalize(samplePos-boxPos);
-		vec3 bumpcol = cubeTex(samplePos*0.1, normal, bumptex, tr, offset, ts);
+		vec3 bumpcol = cubeTex(samplePos*0.1, normal, bumptex, tr, offset, ts, r);
 		bump = bumpcol.g*BUMP_FACTOR;
 	}
 	vec3 d = abs(samplePos-boxPos) - boxDim;
@@ -175,7 +177,7 @@ float fmod(float a, float b)
 //TS is the texture's size.
 //tex is the texturemap.
 //offset is the object's tex_offset variable.
-vec3 get_texture(vec3 p, vec3 n, int t, vec2 ts, vec2 tr, sampler2D tex, vec3 offset)
+vec3 get_texture(vec3 p, vec3 n, int t, vec2 ts, vec2 tr, sampler2D tex, vec3 offset, mat3 r)
 {
 	if (t == 1) //Plane. Has it's own math, because it's always perfectly level, thus faster to calculate.
 	{
@@ -190,7 +192,7 @@ vec3 get_texture(vec3 p, vec3 n, int t, vec2 ts, vec2 tr, sampler2D tex, vec3 of
 		return getTexel(tex, vec2(u, v), offset, ts).rgb;
 	} else if (t == 4) //Cube. Just calls cubeTex.
 	{
-		return cubeTex(p, n, tex_atlas, tr, offset, ts);
+		return cubeTex(p, n, tex_atlas, tr, offset, ts, r);
 	}
 	return vec3(1.0);
 }
@@ -226,7 +228,7 @@ RESULT map(vec3 pos)
 			if (objects[0].hasBumpMap)
 			{
 				//float sdBoxBump(vec3 samplePos, vec3 boxPos, vec3 boxDim, sampler2D bumptex, vec2 tr, vec3 offset, vec2 ts)
-				q = sdBoxBump(pos, objects[0].p, objects[0].b, bump_atlas, objects[0].texrepeat, objects[0].bump_offset, objects[0].texsize);
+				q = sdBoxBump(pos, objects[0].p, objects[0].b, bump_atlas, objects[0].texrepeat, objects[0].bump_offset, objects[0].texsize, objects[0].r);
 				// q = sdBox(pos - objects[0].p,objects[0].b);
 			} else {
 				q = sdBox(pos - objects[0].p,objects[0].b, objects[0].r);
@@ -277,7 +279,7 @@ RESULT map(vec3 pos)
 				float q = 0.0;
 				if (objects[o].hasBumpMap)
 				{
-					q = sdBoxBump(pos, objects[o].p, objects[o].b, bump_atlas, objects[o].texrepeat, objects[o].bump_offset, objects[o].texsize);
+					q = sdBoxBump(pos, objects[o].p, objects[o].b, bump_atlas, objects[o].texrepeat, objects[o].bump_offset, objects[o].texsize, objects[o].r);
 					// q = sdBox(pos - objects[o].p,objects[o].b);
 				} else {
 					q = sdBox(pos - objects[o].p,objects[o].b, objects[o].r);
@@ -438,21 +440,6 @@ vec3 calcFog(vec3 pos, vec3 rd, vec3 sky_color)
 	return col;
 }
 
-// float calcSSS( in vec3 pos, in vec3 nor )
-// {
-//   vec4 kk;
-// 	float occ = 0.0;
-//   for( int i=0; i<8; i++ )
-//   {
-//       float h = 0.002 + 0.11*float(i)/7.0;
-//       vec3 dir = normalize( sin( float(i)*13.0 + vec3(0.0,2.1,4.2) ) );
-//       dir *= sign(dot(dir,nor));
-//       occ += (h-mapOpaque(pos-h*dir, kk).x);
-//   }
-//   occ = clamp( 1.0 - 11.0*occ/8.0, 0.0, 1.0 );
-//   return occ*occ;
-// }
-
 //------------------------------------------------------------------------------
 // BRDF
 //------------------------------------------------------------------------------
@@ -533,7 +520,7 @@ vec2 PrefilteredDFG_Karis(float roughness, float NoV) {
 
 //Hardshadow function.
 //Pretty much unused, but the BRDF functions sometimes use it.
-//No reason to use it over the softshadow function, as it has the same artifacts, same performance but worse looks.
+//No reason to use it over the softshadow function, as it has the same artifacts, same performance but looks worse.
 float shadow(in vec3 origin, in vec3 direction) {
   float hit = 1.0;
   float t = 0.02;
@@ -663,7 +650,7 @@ vec3 render( in vec3 ro, in vec3 rd )
 		// material
 		col = m;
 		//vec3 get_texture(vec3 p, vec3 n, int t, vec2 ts, vec2 tr, sampler2D tex, vec3 offset)
-		if (objects[id].isTextured) col *= get_texture(pos - objects[id].p, nor, objects[id].Type, objects[id].texsize, objects[id].texrepeat, tex_atlas, objects[id].tex_offset);
+		if (objects[id].isTextured) col *= get_texture(pos - objects[id].p, nor, objects[id].Type, objects[id].texsize, objects[id].texrepeat, tex_atlas, objects[id].tex_offset, objects[id].r);
 		if (m.x == -2.0)
 		{
 			if (m.y == -2.0)
@@ -782,6 +769,13 @@ mat3 setCamera( in vec3 ro, in vec3 ta, float cr )
 vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords)
 {
 	vec2 fragCoord = vec2(screen_coords.x, screen_res.y - screen_coords.y);
+#if CHECKERBOARD
+	float offset = mod(fragCoord.y, 2.0);
+	if (mod(fragCoord.x + offset, 2.0) > 0.5)
+	{
+		return vec4(0.0);
+	}
+#endif
 	float time = 15.0 + iTime.x;
 
   vec3 tot = vec3(0.0,0.0,0.0);

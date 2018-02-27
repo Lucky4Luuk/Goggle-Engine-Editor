@@ -132,7 +132,7 @@ function renderer_load()
   fxaa = love.graphics.newShader("engine/shaders/fxaa.glsl")
 end
 
-function render()
+function render(c)
   --Set variables
 	send("iTime",{iTime,iTimeDelta})
   send("cam_pos", cam_pos)
@@ -147,7 +147,16 @@ function render()
   if FLAGS.AA and MODE == "game" then
     love.graphics.setCanvas()
     love.graphics.setShader(fxaa)
+    if c then
+      love.graphics.setCanvas(c)
+    end
     love.graphics.draw(canvas)
+    if c then
+      love.graphics.setCanvas()
+    end
   end
   love.graphics.setShader()
+  if c then
+    return c
+  end
 end
