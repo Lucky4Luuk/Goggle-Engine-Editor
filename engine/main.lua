@@ -267,19 +267,16 @@ function engine.update(dt)
 	end
 end
 
-function engine.draw()
-	--Draw Stuff
+function engine.draw(gamecanvas)
 	if CHECKERBOARD then
-		CHECKER_CANVAS = render(CHECKER_CANVAS)
-	else
-		render()
-	end
-
-	--Handle Checkerboard Stuff
-	if CHECKERBOARD then
+		-- love.graphics.setCanvas(CHECKER_CANVAS)
+		local c = render()
+		love.graphics.setCanvas(gamecanvas)
 		love.graphics.setShader(CHECKER_SHADER)
-		love.graphics.draw(CHECKER_CANVAS)
+		love.graphics.draw(c)
 		love.graphics.setShader()
+	else
+		love.graphics.draw(render())
 	end
 
 	--FPS Counter
@@ -300,6 +297,7 @@ function engine.draw()
 		dy = dy + 20
 	end
 	love.graphics.setBlendMode("alpha")
+	love.graphics.setCanvas()
 end
 
 function engine.keypressed(k)
@@ -335,7 +333,7 @@ function engine.keypressed(k)
 end
 
 function engine.resize(w, h)
-	canvas = love.graphics.newCanvas(width,height)
+	canvas = love.graphics.newCanvas(width, height)
 	CHECKER_CANVAS = love.graphics.newCanvas(width, height)
 	setSize(width, height)
 	updateAtlas(tex_atlas[1], bump_atlas[1])
@@ -343,6 +341,7 @@ function engine.resize(w, h)
 	updateLightsList(lights)
 	send("fog_density",fog_density)
 	send("view_distance",view_distance)
+	send(CHECKER_SHADER, "screen_res", {width, height})
 end
 
 return engine

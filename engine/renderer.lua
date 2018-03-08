@@ -7,6 +7,7 @@ local cam_dir = {1,0,0}
 local cam_pos = {3,1,0}
 local shader = nil
 local fxaa = nil
+local fxaa_canvas = nil
 local sensitivityX = 0.5
 local sensitivityY = 0.5
 
@@ -114,6 +115,9 @@ end
 
 function setCanvas(c)
   canvas = c
+  w = canvas:getWidth()
+  h = canvas:getHeight()
+  fxaa_canvas = love.graphics.newCanvas(w, h)
   return true
 end
 
@@ -122,41 +126,46 @@ function setShader(s)
   return true
 end
 
-function send(name, value)
-  if shader:hasUniform(name) then
-    shader:send(name, value)
+function send(s, name, value)
+  if value == nil then
+    if shader:hasUniform(s) then
+      shader:send(s, name)
+    end
+  elseif s:hasUniform(name) then
+    s:send(name, value)
   end
 end
 
 function renderer_load()
   fxaa = love.graphics.newShader("engine/shaders/fxaa.glsl")
+  fxaa_canvas = love.graphics.newCanvas(width, height)
 end
 
-function render(c)
+function render()
   --Set variables
 	send("iTime",{iTime,iTimeDelta})
   send("cam_pos", cam_pos)
   send("cam_dir", cam_dir)
   send("screen_res", {width, height})
   love.graphics.setShader(shader)
-  if FLAGS.AA and MODE == "game" then
-    love.graphics.setCanvas(canvas)
-  end
+  love.graphics.setCanvas(canvas)
 	love.graphics.setColor(1,1,1,1)
-	love.graphics.rectangle("fill",0,0,love.graphics.getWidth(),love.graphics.getHeight())
+	-- love.graphics.rectangle("fill",0,0,love.graphics.getWidth(),love.graphics.getHeight())
+  for x=0, love.graphics.getWidth(), 64 do
+    for y=0, love.graphics.getHeight(), 64 do
+      love.graphics.rectangle("fill",x,y,64,64)
+    end
+  end
   if FLAGS.AA and MODE == "game" then
     love.graphics.setCanvas()
     love.graphics.setShader(fxaa)
-    if c then
-      love.graphics.setCanvas(c)
-    end
+    love.graphics.setCanvas(fxaa_canvas)
     love.graphics.draw(canvas)
-    if c then
-      love.graphics.setCanvas()
-    end
+    love.graphics.setCanvas()
   end
   love.graphics.setShader()
-  if c then
-    return c
+  if FLAGS.AA and MODE == "game" then
+    return fxaa_canvas
   end
+  return canvas
 end

@@ -73,7 +73,7 @@ struct GI_TRACE {
 	int id; //Object ID.
 	vec4 m; //Material.
 };
-#define SAMPLES 128 //More samples means better image quality.
+#define SAMPLES 32 //More samples means better image quality.
 
 #define AA 1 //The amount of MSAA. Usually not needed, as it's quite heavy.
 //The engine already uses FXAA too.

@@ -1,1 +1,1 @@
-{name="Plane Object",{{name="Floor Plane",t="Plane",pos={0,0,0},size={0,0,0},color={255,255,255},alpha=255,roughness=0.2,metallic=0,ref=1, _tex="Textures/floor.png", texsize={0,0}, texrepeat={1,1}, bsr=0.0, vel={0,0,0}, res=0.5, mass=0.0}}}
+{name="Plane Object",{{name="Floor Plane",t="Plane",pos={0,0,0},size={0,0,0},color={255,255,255},alpha=255,roughness=0.2,metallic=0,ref=1, tex="Textures/floor.png", texsize={0,0}, texrepeat={1,1}, bsr=0.0, vel={0,0,0}, res=0.5, mass=0.0}}}

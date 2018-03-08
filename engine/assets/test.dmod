@@ -1,1 +1,1 @@
-{name="Cube",{{name="Cube",t="Box",pos={0,0.5,0},rot={x=0,y=0,z=0},size={0.5,0.5,0.5},color={255,255,255},alpha=50,roughness=0.2,metallic=0,ref=1, bsr=0.6, vel={0,0,0}, res=0.5, mass=1.0, tex="Textures/floor.png", texsize={0,0}, texrepeat={1,1}, _script="Scripts/spinningbox"}}}
+{name="Cube",{{name="Cube",t="Box",pos={0,0.5,0},rot={x=0,y=0,z=0},size={0.5,0.5,0.5},color={255,255,255},alpha=50,roughness=0.2,metallic=0,ref=1, bsr=0.6, vel={0,0,0}, res=0.5, mass=1.0, tex="Textures/brick.jpg", texsize={0,0}, texrepeat={1,1}, script="Scripts/spinningbox"}}}

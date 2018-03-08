@@ -152,9 +152,9 @@ end
 
 function love.draw()
   gui.draw()
-  love.graphics.setCanvas(engine.gamecanvas)
-  engine.draw()
-  love.graphics.setCanvas()
+  -- love.graphics.setCanvas(engine.gamecanvas)
+  engine.draw(engine.gamecanvas)
+  -- love.graphics.setCanvas()
   love.graphics.push()
   if gui.mode == "editor" then
     love.graphics.translate(gui.settings.docked_window_width + gui.gamecanvas.offset, love.graphics.getHeight()/16)
